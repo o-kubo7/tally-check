@@ -2,7 +2,7 @@
   "name": "入庫検算カメラ",
   "short_name": "検算カメラ",
   "description": "紙のタリー表を撮影して計算ミスを検出する",
-  "start_url": "./tally-check.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
