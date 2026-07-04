@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0E4D52" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="検算カメラ" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<link rel="icon" type="image/png" href="icon-192.png" />
+<title>入庫検算カメラ</title>
+<style>
+  :root{
+    --paper:#EEF0EC; --panel:#FBFCFA; --ink:#16191C; --muted:#5A6169;
+    --line:#D5D9D2; --lineSoft:#E4E7E1; --brand:#0E4D52; --brandInk:#F4FBFB;
+    --ok:#1B7A4B; --okBg:#EAF4EE; --err:#C62D1F; --errBg:#FBEBE9;
+    --warn:#B5761A; --warnBg:#FAF3E6;
+    --mono:'SF Mono','JetBrains Mono','Roboto Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);
+    padding-bottom:calc(64px + env(safe-area-inset-bottom));-webkit-text-size-adjust:100%}
+  header{background:var(--brand);color:var(--brandInk);
+    padding:calc(20px + env(safe-area-inset-top)) 20px 18px}
+  .wrap{max-width:940px;margin:0 auto}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.22em;
+    text-transform:uppercase;opacity:.7}
+  h1{margin:4px 0 10px;font-size:26px;font-weight:700}
+  .formula{font-family:var(--mono);font-size:13px;line-height:1.7;opacity:.92;
+    border-top:1px solid rgba(255,255,255,.18);padding-top:10px}
+  .formula .sub{opacity:.75}
+  main{max-width:940px;margin:0 auto;padding:20px 20px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .keyrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .keyrow input{flex:1 1 200px;min-width:0;font-family:var(--mono);font-size:14px;
+    padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+  .keyrow input:focus{outline:2px solid var(--brand);outline-offset:-1px;border-color:var(--brand)}
+  .keystate{font-size:12px;font-family:var(--mono);color:var(--muted)}
+  .keystate.saved{color:var(--ok)}
+  .linkbtn{appearance:none;background:none;border:none;color:var(--muted);
+    font-size:12px;cursor:pointer;text-decoration:underline;padding:0;font-family:var(--sans)}
+  .hint{font-size:12px;color:var(--muted);line-height:1.7;margin:8px 0 0}
+  .hint a{color:var(--brand)}
+  .modelrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .modelrow label{font-size:12px;color:var(--muted);font-family:var(--mono)}
+  .modelrow select{flex:1 1 220px;min-width:0;font-family:var(--mono);font-size:14px;
+    padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+  .modelrow select:focus{outline:2px solid var(--brand);outline-offset:-1px;border-color:var(--brand)}
+  .grabber{display:flex;gap:16px;align-items:stretch;flex-wrap:wrap;margin-top:14px}
+  .drop{flex:1 1 260px;min-height:150px;border:1.5px dashed var(--brand);border-radius:8px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;text-align:center}
+  .drop.has{border-color:var(--line);background:#000}
+  .drop img{max-width:100%;max-height:260px;display:block}
+  .drop .ph{color:var(--muted);padding:20px}
+  .drop .ph b{color:var(--ink);font-size:15px;display:block}
+  .drop .ph span{font-size:13px;display:block;margin-top:6px}
+  .side{flex:1 1 220px;display:flex;flex-direction:column;justify-content:center;gap:12px}
+  .btn{appearance:none;border:none;border-radius:8px;padding:13px 18px;font-size:15px;
+    font-weight:700;font-family:var(--sans);cursor:pointer;background:var(--brand);color:var(--brandInk)}
+  .btn:disabled{background:var(--line);color:var(--muted);cursor:default}
+  .alert{margin-top:16px;border-radius:8px;padding:12px 14px;font-size:14px}
+  .alert.err{background:var(--errBg);border:1px solid var(--err);color:var(--err)}
+  .alert.ok{background:var(--okBg);border:1px solid var(--ok);color:var(--ok);font-weight:600}
+  .alert.info{background:var(--warnBg);border:1px solid var(--warn);color:var(--warn)}
+  .working{margin-top:20px;text-align:center;color:var(--muted);font-size:14px;font-family:var(--mono)}
+  .stats{margin-top:22px;display:flex;gap:10px;flex-wrap:wrap}
+  .stat{flex:1 1 120px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+  .stat .l{font-size:11px;color:var(--muted);letter-spacing:.04em;font-family:var(--mono)}
+  .stat .v{font-size:26px;font-weight:700;font-family:var(--mono);line-height:1.1;margin-top:2px}
+  .stat.err.on{background:var(--errBg);border-color:var(--err)} .stat.err.on .v{color:var(--err)}
+  .stat.warn.on{background:var(--warnBg);border-color:var(--warn)} .stat.warn.on .v{color:var(--warn)}
+  .stat.ok .v{color:var(--ok)}
+  .thead{display:grid;grid-template-columns:44px 1.3fr .9fr .9fr .7fr .7fr .6fr 1fr;
+    font-family:var(--mono);font-size:11px;color:var(--muted);padding:0 4px 6px;margin-top:18px}
+  .thead>div{text-align:right} .thead .s{text-align:center} .thead .b{text-align:left;padding-left:8px}
+  .tbl{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+  .row{border-bottom:1px solid var(--lineSoft)}
+  .row:last-child{border-bottom:none}
+  .rmain{display:grid;grid-template-columns:44px 1.3fr .9fr .9fr .7fr .7fr .6fr 1fr;
+    align-items:center;padding:11px 4px;cursor:pointer;border-left:3px solid var(--line)}
+  .rmain>div{text-align:right;font-family:var(--mono);font-size:13.5px}
+  .rmain .stamp{text-align:center;font-size:11px;font-weight:700}
+  .rmain .unit{color:var(--muted);font-size:11px;margin-left:3px}
+  .rmain .b{text-align:left;padding-left:8px;font-size:12.5px;color:var(--muted);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rdet{padding:4px 16px 16px 47px;font-family:var(--mono);font-size:13px;line-height:1.9}
+  .rdet .mut{color:var(--muted)} .rdet .w{color:var(--warn);margin-top:6px}
+  .rdet .de{color:var(--err);font-weight:700} .rdet .dok{color:var(--ok);font-weight:700}
+  .note{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.7}
+  .footer{max-width:940px;margin:22px auto 0;padding:0 20px;font-size:11px;color:var(--muted);
+    font-family:var(--mono);line-height:1.6}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="eyebrow">Tally Check</div>
+    <h1>入庫検算カメラ</h1>
+    <div class="formula">
+      納品数 ＝ パレット数 × 1P総数 ＋ ケース数 × 1C/S数 ＋ 端数<br />
+      <span class="sub">補助 : 1P総数 ＝ 1C/S数 × 段積み数(備考) — 段積み設定ミスを検出</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <div class="keyrow">
+      <input id="apikey" type="password" placeholder="Gemini APIキーを貼り付け" autocomplete="off" />
+      <button class="btn" id="saveKey" style="flex:0 0 auto;padding:11px 16px;font-size:14px">保存</button>
+      <span class="keystate" id="keyState">未保存</span>
+      <button class="linkbtn" id="clearKey" style="flex:0 0 auto">消去</button>
+    </div>
+    <p class="hint">
+      キーはこの端末のブラウザ内にのみ保存され、外部やファイルには書き込まれません。
+      キーは <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a> で無料取得できます（無料枠あり）。
+    </p>
+
+    <div class="modelrow">
+      <label for="model">モデル</label>
+      <select id="model"></select>
+      <button class="linkbtn" id="refreshModels" style="flex:0 0 auto">一覧を更新</button>
+    </div>
+    <p class="hint" id="modelHint">既定は自動更新エイリアス（常に最新のFlash-Lite）。APIキー保存後に「一覧を更新」で現在の選択肢を取得できます。</p>
+
+    <div class="grabber">
+      <label class="drop" id="drop">
+        <div class="ph" id="ph"><b>タリー表の写真を撮る／選ぶ</b><span>タップ、またはここに画像をドロップ</span></div>
+        <input id="file" type="file" accept="image/*" capture="environment" hidden />
+      </label>
+      <div class="side">
+        <p class="hint">表全体がまっすぐ、明るく写るように撮影してください。抽出後、計算が合わない行を自動で赤く表示します。</p>
+        <button class="btn" id="run" disabled>表を読み取って検算する</button>
+        <button class="linkbtn" id="reset" style="align-self:flex-start;display:none">別の画像を選ぶ</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="notice"></div>
+  <div id="alert"></div>
+  <div id="working" class="working" hidden>画像から表を抽出しています…</div>
+  <div id="results"></div>
+</main>
+
+<div class="footer">gemini-2.5-flash-lite · 検算はすべて端末内で決定的に計算 · プロトタイプ由来ロジック</div>
+
+<script>
+"use strict";
+
+/* ---------- 定数 ---------- */
+var API_BASE = "https://generativelanguage.googleapis.com/v1beta";
+var DEFAULT_MODEL = "gemini-flash-lite-latest";  // 常に最新Flash-Liteを指す自動更新エイリアス
+var FALLBACK_MODEL = "gemini-flash-lite-latest"; // 選択モデルが廃止/未対応の時の切替先
+function endpointFor(model){ return API_BASE + "/models/" + model + ":generateContent"; }
+// models.list には出ない自動更新エイリアスを常に候補として提示する
+var ALIAS_MODELS = ["gemini-flash-lite-latest","gemini-flash-latest"];
+// 一覧から画像対応の生成モデルだけを残すための除外パターン（埋め込み/画像生成/音声等を除外）
+var EXCLUDE_RE = /embedding|image|imagen|veo|tts|audio|aqa|gemma/i;
+var LS_KEY = "tallycheck_gemini_key";
+var LS_MODEL = "tallycheck_gemini_model";
+
+var EXTRACT_PROMPT =
+"あなたは倉庫の入庫タリー表を読み取るOCRエンジンです。\n" +
+"添付画像の表を、各行=1レコードとしてJSONで抽出してください。\n" +
+"列は左から: 納品数 / 1C/S数 / 1P総数 / パレット数 / ケース数 / 端数 / 備考 です。\n\n" +
+"規則:\n" +
+"- 数値はカンマを除いた整数で返す（例 30,000 → 30000）。\n" +
+"- 空セルは null。\n" +
+"- 納品数セルの単位（マイ / コ / ホン / カン 等）は unit に文字列で入れる。数値には含めない。\n" +
+"- 備考は 8*4 / 4*6+1 / 黒4*6+1 のような文字列をそのまま入れる。空なら空文字。\n" +
+"- 合計行や見出し行（RB入庫数 等）、手書きメモ行は含めない。データ行のみ。\n" +
+"- 読み取れない数字は推測で埋めない。\n\n" +
+'次のJSON形式のオブジェクトのみを返す: {"rows":[{"nouhin":整数かnull,"unit":"文字列","cs":整数かnull,"ptotal":整数かnull,"pallet":整数かnull,"kaisu":整数かnull,"hasu":整数かnull,"biko":"文字列"}]}';
+
+/* ---------- 数値・備考パース ---------- */
+function num(v){
+  if(v===null||v===undefined||v==="") return null;
+  if(typeof v==="number") return isFinite(v)?v:null;
+  var s=String(v).replace(/[,，\s]/g,"");
+  if(s==="") return null;
+  var n=Number(s);
+  return isFinite(n)?n:null;
+}
+function parseBiko(biko){
+  if(biko===null||biko===undefined) return null;
+  var cleaned=String(biko).replace(/[^0-9*+\-]/g,"");
+  var m=cleaned.match(/^(\d+)\*(\d+)([+\-]\d+)?$/);
+  if(!m) return null;
+  var val=parseInt(m[1],10)*parseInt(m[2],10);
+  if(m[3]) val+=parseInt(m[3],10);
+  return val;
+}
+function fmt(n){ return (n===null||n===undefined)?"—":n.toLocaleString("en-US"); }
+
+/* ---------- 検算 ---------- */
+function verifyRow(raw){
+  var r={
+    nouhin:num(raw.nouhin), unit:raw.unit||"", cs:num(raw.cs), ptotal:num(raw.ptotal),
+    pallet:num(raw.pallet), kaisu:num(raw.kaisu), hasu:num(raw.hasu), biko:raw.biko||""
+  };
+  var warnings=[], status="incomplete", expected=null, diff=null;
+  var haveAll=[r.nouhin,r.pallet,r.ptotal,r.kaisu,r.cs,r.hasu].every(function(x){return x!==null;});
+  if(haveAll){
+    expected=r.pallet*r.ptotal + r.kaisu*r.cs + r.hasu;
+    diff=r.nouhin-expected;
+    status=(diff===0)?"ok":"error";
+  }
+  var stack=parseBiko(r.biko);
+  if(stack!==null && r.cs!==null && r.ptotal!==null){
+    var expP=r.cs*stack;
+    if(expP!==r.ptotal){
+      warnings.push("段積み不一致: 1C/S "+fmt(r.cs)+" × "+r.biko+"(="+stack+") = "+fmt(expP)+" ≠ 1P総数 "+fmt(r.ptotal));
+    }
+  }
+  r.status=status; r.expected=expected; r.diff=diff; r.warnings=warnings;
+  return r;
+}
+
+/* ---------- 状態 ---------- */
+var img=null; // {b64, mime, url}
+
+/* ---------- DOM ---------- */
+var $=function(id){return document.getElementById(id);};
+var apikeyEl=$("apikey"), keyStateEl=$("keyState");
+var fileEl=$("file"), dropEl=$("drop"), phEl=$("ph");
+var runEl=$("run"), resetEl=$("reset");
+var alertEl=$("alert"), workingEl=$("working"), resultsEl=$("results");
+var noticeEl=$("notice");
+var modelEl=$("model"), refreshModelsEl=$("refreshModels"), modelHintEl=$("modelHint");
+
+/* ---------- APIキー ---------- */
+function loadKey(){
+  var k="";
+  try{ k=localStorage.getItem(LS_KEY)||""; }catch(e){}
+  if(k){ apikeyEl.value=k; keyStateEl.textContent="保存済み"; keyStateEl.className="keystate saved"; }
+}
+$("saveKey").onclick=function(){
+  var k=apikeyEl.value.trim();
+  if(!k){ keyStateEl.textContent="未入力"; keyStateEl.className="keystate"; return; }
+  try{ localStorage.setItem(LS_KEY,k); }catch(e){}
+  keyStateEl.textContent="保存済み"; keyStateEl.className="keystate saved";
+  clearAlert();
+  fetchModels(k);
+};
+$("clearKey").onclick=function(){
+  try{ localStorage.removeItem(LS_KEY); }catch(e){}
+  apikeyEl.value=""; keyStateEl.textContent="未保存"; keyStateEl.className="keystate";
+};
+
+/* ---------- モデル管理 ---------- */
+function currentModel(){
+  var m="";
+  try{ m=localStorage.getItem(LS_MODEL)||""; }catch(e){}
+  return m||DEFAULT_MODEL;
+}
+function setModel(id){
+  try{ localStorage.setItem(LS_MODEL,id); }catch(e){}
+}
+function optionLabel(id){
+  if(id==="gemini-flash-lite-latest") return "gemini-flash-lite-latest（最新Flash-Lite・推奨/無料枠）";
+  if(id==="gemini-flash-latest") return "gemini-flash-latest（最新Flash）";
+  return id;
+}
+function populateModels(list){
+  var ids=ALIAS_MODELS.slice();
+  (list||[]).forEach(function(id){ if(ids.indexOf(id)<0) ids.push(id); });
+  var sel=currentModel();
+  if(ids.indexOf(sel)<0) ids.unshift(sel); // 保存済みが一覧に無くても選択を保持
+  modelEl.innerHTML="";
+  ids.forEach(function(id){
+    var o=document.createElement("option");
+    o.value=id; o.textContent=optionLabel(id);
+    if(id===sel) o.selected=true;
+    modelEl.appendChild(o);
+  });
+}
+modelEl.onchange=function(){ setModel(modelEl.value); };
+
+function fetchModels(key){
+  if(!key){ return; }
+  modelHintEl.textContent="モデル一覧を取得中…";
+  fetch(API_BASE + "/models",{ headers:{ "x-goog-api-key":key } })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var out=[];
+      (data.models||[]).forEach(function(m){
+        var id=String(m.name||"").split("/").pop();
+        if(!id) return;
+        var methods=m.supportedGenerationMethods||m.supportedActions||[];
+        var okGen = (methods.length===0) ? true : (methods.indexOf("generateContent")>=0);
+        if(!okGen) return;
+        if(EXCLUDE_RE.test(id)) return;
+        if(!/gemini/i.test(id)) return;
+        out.push(id);
+      });
+      out.sort();
+      populateModels(out);
+      modelHintEl.textContent="最新の一覧を反映しました（既定は自動更新エイリアス）。";
+    })
+    .catch(function(){
+      modelHintEl.textContent="一覧の取得に失敗しました。既定のエイリアスで続行できます。";
+    });
+}
+refreshModelsEl.onclick=function(){
+  var key="";
+  try{ key=(localStorage.getItem(LS_KEY)||apikeyEl.value||"").trim(); }catch(e){ key=apikeyEl.value.trim(); }
+  if(!key){ modelHintEl.textContent="先にAPIキーを保存してください。"; return; }
+  fetchModels(key);
+};
+
+/* ---------- 画像入力 ---------- */
+function readFile(file){
+  if(!file){ return; }
+  if(!/^image\//.test(file.type)){ showErr("画像ファイルを選んでください（JPEG / PNG）。"); return; }
+  var reader=new FileReader();
+  reader.onload=function(){
+    var url=reader.result;
+    img={ b64:String(url).split(",")[1], mime:file.type, url:url };
+    phEl.style.display="none";
+    dropEl.classList.add("has");
+    var old=dropEl.querySelector("img"); if(old) old.remove();
+    var im=document.createElement("img"); im.src=url; im.alt="読み込んだタリー表"; dropEl.appendChild(im);
+    runEl.disabled=false; resetEl.style.display="inline";
+    clearAlert(); resultsEl.innerHTML="";
+  };
+  reader.onerror=function(){ showErr("画像の読み込みに失敗しました。別のファイルで試してください。"); };
+  reader.readAsDataURL(file);
+}
+fileEl.onchange=function(e){ readFile(e.target.files&&e.target.files[0]); };
+dropEl.addEventListener("dragover",function(e){e.preventDefault();});
+dropEl.addEventListener("drop",function(e){
+  e.preventDefault();
+  readFile(e.dataTransfer.files&&e.dataTransfer.files[0]);
+});
+resetEl.onclick=function(){
+  img=null; fileEl.value="";
+  var old=dropEl.querySelector("img"); if(old) old.remove();
+  dropEl.classList.remove("has"); phEl.style.display="block";
+  runEl.disabled=true; resetEl.style.display="none";
+  resultsEl.innerHTML=""; clearAlert();
+};
+
+/* ---------- 表示ユーティリティ ---------- */
+function clearAlert(){ alertEl.innerHTML=""; }
+function showErr(msg){
+  alertEl.innerHTML='<div class="alert err"></div>';
+  alertEl.firstChild.textContent=msg;
+}
+function clearNotice(){ noticeEl.innerHTML=""; }
+function showNotice(msg){
+  noticeEl.innerHTML='<div class="alert info"></div>';
+  noticeEl.firstChild.textContent=msg;
+}
+
+/* ---------- 実行 ---------- */
+runEl.onclick=function(){
+  var key="";
+  try{ key=(localStorage.getItem(LS_KEY)||apikeyEl.value||"").trim(); }catch(e){ key=apikeyEl.value.trim(); }
+  if(!key){ showErr("先にGemini APIキーを入力・保存してください。"); return; }
+  if(!img){ return; }
+  clearNotice();
+  runCheck(key, currentModel(), false);
+};
+
+function runCheck(key, model, isFallback){
+  clearAlert(); resultsEl.innerHTML="";
+  runEl.disabled=true; workingEl.hidden=false;
+
+  var body={
+    contents:[{ parts:[
+      { inline_data:{ mime_type:img.mime, data:img.b64 } },
+      { text:EXTRACT_PROMPT }
+    ]}],
+    generationConfig:{ responseMimeType:"application/json", temperature:0 }
+  };
+
+  fetch(endpointFor(model),{
+    method:"POST",
+    headers:{ "Content-Type":"application/json", "x-goog-api-key":key },
+    body:JSON.stringify(body)
+  }).then(function(res){
+    return res.json().then(function(data){ return {ok:res.ok,status:res.status,data:data}; });
+  }).then(function(out){
+    workingEl.hidden=true; runEl.disabled=false;
+    if(!out.ok){
+      var em=(out.data&&out.data.error&&out.data.error.message)||("HTTP "+out.status);
+      var deprecated = out.status===404 || /not found|not supported|unsupported|deprecated|does not exist|invalid model/i.test(em);
+      if(deprecated && !isFallback && model!==FALLBACK_MODEL){
+        setModel(FALLBACK_MODEL);
+        populateModels(null);
+        showNotice("モデル「"+model+"」が利用できないため、"+FALLBACK_MODEL+" に切り替えて再試行します。");
+        runCheck(key, FALLBACK_MODEL, true);
+        return;
+      }
+      if(out.status===400&&/API key/i.test(em)) em="APIキーが無効です。キーを確認してください。";
+      if(out.status===429) em="レート制限に達しました。少し待って再試行してください（無料枠の上限の可能性）。";
+      showErr("抽出に失敗しました: "+em);
+      return;
+    }
+    var text="";
+    try{
+      var parts=out.data.candidates[0].content.parts;
+      for(var i=0;i<parts.length;i++){ if(parts[i].text) text+=parts[i].text; }
+    }catch(e){ showErr("応答の形式が想定と異なります。再試行してください。"); return; }
+
+    var parsed;
+    try{
+      var clean=text.replace(/```json/gi,"").replace(/```/g,"").trim();
+      var s=clean.indexOf("{"), en=clean.lastIndexOf("}");
+      parsed=JSON.parse(clean.slice(s,en+1));
+    }catch(e){ showErr("表の解析に失敗しました。表全体が鮮明に写るよう撮り直してください。"); return; }
+
+    var rows=(parsed.rows||[]).map(verifyRow);
+    if(rows.length===0){ showErr("表を検出できませんでした。表全体が写るよう撮り直してください。"); return; }
+    render(rows);
+  }).catch(function(){
+    workingEl.hidden=true; runEl.disabled=false;
+    showErr("通信に失敗しました。ネットワーク接続を確認して再試行してください。");
+  });
+}
+
+/* ---------- 結果描画 ---------- */
+function render(rows){
+  var nErr=0,nWarn=0,nInc=0,nOk=0;
+  rows.forEach(function(r){
+    if(r.status==="error") nErr++;
+    if(r.warnings.length>0) nWarn++;
+    if(r.status==="incomplete") nInc++;
+    if(r.status==="ok"&&r.warnings.length===0) nOk++;
+  });
+
+  var html="";
+  html+='<section class="stats">';
+  html+=statChip("行数",rows.length,"neutral",false);
+  html+=statChip("計算ミス",nErr,"err",nErr>0);
+  html+=statChip("段積み警告",nWarn,"warn",nWarn>0);
+  html+=statChip("検算不可",nInc,"neutral",false);
+  html+=statChip("正常",nOk,"ok",false);
+  html+='</section>';
+
+  if(nErr===0&&nWarn===0){
+    html+='<div class="alert ok">全行で計算が一致しました。</div>';
+  }
+
+  html+='<div class="thead"><div class="s"></div><div>納品数</div><div>1C/S</div><div>1P総数</div>'
+      +'<div>パレット</div><div>ケース</div><div>端数</div><div class="b">備考</div></div>';
+  html+='<div class="tbl">';
+  rows.forEach(function(r,i){ html+=rowHtml(r,i); });
+  html+='</div>';
+  html+='<p class="note">赤 = 主検算の不一致（計算ミス、または読み取り誤り）。オレンジ = 段積み数の不一致（設定ミス候補）。'
+      +'数値は原本と照合できるよう抽出値をそのまま表示しています。行をタップすると内訳が開きます。</p>';
+
+  resultsEl.innerHTML=html;
+
+  // 行の開閉
+  var mains=resultsEl.querySelectorAll(".rmain");
+  for(var k=0;k<mains.length;k++){
+    mains[k].addEventListener("click",function(){
+      var det=this.parentNode.querySelector(".rdet");
+      if(det) det.style.display=(det.style.display==="none")?"block":"none";
+    });
+  }
+}
+
+function statChip(label,val,tone,on){
+  var cls="stat "+tone+(on?" on":"");
+  return '<div class="'+cls+'"><div class="l">'+label+'</div><div class="v">'+val+'</div></div>';
+}
+
+function esc(s){ return String(s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
+
+function rowHtml(r,i){
+  var bar=r.status==="error"?"var(--err)":(r.warnings.length>0?"var(--warn)":(r.status==="incomplete"?"var(--line)":"var(--ok)"));
+  var bg=r.status==="error"?"var(--errBg)":(r.warnings.length>0?"var(--warnBg)":"transparent");
+  var stamp, sc;
+  if(r.status==="error"){ stamp="NG"; sc="var(--err)"; }
+  else if(r.status==="incomplete"){ stamp="—"; sc="var(--muted)"; }
+  else if(r.warnings.length>0){ stamp="!"; sc="var(--warn)"; }
+  else { stamp="OK"; sc="var(--ok)"; }
+
+  var h='<div class="row" style="background:'+bg+'">';
+  h+='<div class="rmain" style="border-left-color:'+bar+'">';
+  h+='<div class="stamp" style="color:'+sc+'">'+stamp+'</div>';
+  h+='<div>'+fmt(r.nouhin)+'<span class="unit">'+esc(r.unit)+'</span></div>';
+  h+='<div>'+fmt(r.cs)+'</div><div>'+fmt(r.ptotal)+'</div><div>'+fmt(r.pallet)+'</div>';
+  h+='<div>'+fmt(r.kaisu)+'</div><div>'+fmt(r.hasu)+'</div>';
+  h+='<div class="b">'+(r.biko?esc(r.biko):"—")+'</div>';
+  h+='</div>';
+
+  // 詳細（初期非表示）
+  h+='<div class="rdet" style="display:none">';
+  if(r.status==="incomplete"){
+    h+='<div class="mut">主検算に必要な数値が欠けているため検算できません。抽出できなかったセルがないか原本と照合してください。</div>';
+  }else{
+    h+='<div class="mut">パレット '+fmt(r.pallet)+' × 1P '+fmt(r.ptotal)+' ＋ ケース '+fmt(r.kaisu)+' × 1C/S '+fmt(r.cs)+' ＋ 端数 '+fmt(r.hasu)+'</div>';
+    h+='<div><span class="mut">＝ 期待値 </span><b>'+fmt(r.expected)+'</b><span class="mut"> ／ 実測 </span><b>'+fmt(r.nouhin)+'</b>';
+    if(r.status==="error"){ h+='<span class="de">　差 '+(r.diff>0?"+":"")+fmt(r.diff)+'</span>'; }
+    else { h+='<span class="dok">　一致</span>'; }
+    h+='</div>';
+  }
+  r.warnings.forEach(function(w){ h+='<div class="w">⚠ '+esc(w)+'</div>'; });
+  h+='</div></div>';
+  return h;
+}
+
+/* ---------- 起動 ---------- */
+loadKey();
+populateModels(null);          // まずエイリアスと保存済み選択を表示
+(function(){
+  var k="";
+  try{ k=localStorage.getItem(LS_KEY)||""; }catch(e){}
+  if(k) fetchModels(k);        // キーがあれば最新一覧を取得
+})();
+
+/* Service Worker登録（https/localhostでのみ有効。file://では無視される） */
+if("serviceWorker" in navigator){
+  window.addEventListener("load",function(){
+    navigator.serviceWorker.register("service-worker.js").catch(function(){});
+  });
+}
+</script>
+</body>
+</html>
