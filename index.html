@@ -58,6 +58,9 @@
   .drop .ph{color:var(--muted);padding:20px}
   .drop .ph b{color:var(--ink);font-size:15px;display:block}
   .drop .ph span{font-size:13px;display:block;margin-top:6px}
+  .phbtns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+  .btn.sm{padding:10px 14px;font-size:14px}
+  .btn.ghost{background:var(--panel);color:var(--ink);border:1px solid var(--line)}
   .side{flex:1 1 220px;display:flex;flex-direction:column;justify-content:center;gap:12px}
   .btn{appearance:none;border:none;border-radius:8px;padding:13px 18px;font-size:15px;
     font-weight:700;font-family:var(--sans);cursor:pointer;background:var(--brand);color:var(--brandInk)}
@@ -129,8 +132,16 @@
 
     <div class="grabber">
       <label class="drop" id="drop">
-        <div class="ph" id="ph"><b>タリー表の写真を撮る／選ぶ</b><span>タップ、またはここに画像をドロップ</span></div>
+        <div class="ph" id="ph">
+          <b>タリー表の写真を撮る／選ぶ</b>
+          <span>下のボタンから撮影・選択（ここに画像をドロップも可）</span>
+          <div class="phbtns">
+            <button type="button" class="btn sm" id="camBtn">📷 カメラで撮影</button>
+            <button type="button" class="btn sm ghost" id="pickBtn">🖼 写真から選ぶ</button>
+          </div>
+        </div>
         <input id="file" type="file" accept="image/*" hidden />
+        <input id="fileCam" type="file" accept="image/*" capture="environment" hidden />
       </label>
       <div class="side">
         <p class="hint">表全体がまっすぐ、明るく写るように撮影してください。抽出後、計算が合わない行を自動で赤く表示します。</p>
@@ -226,7 +237,7 @@ var img=null; // {b64, mime, url}
 /* ---------- DOM ---------- */
 var $=function(id){return document.getElementById(id);};
 var apikeyEl=$("apikey"), keyStateEl=$("keyState");
-var fileEl=$("file"), dropEl=$("drop"), phEl=$("ph");
+var fileEl=$("file"), fileCamEl=$("fileCam"), dropEl=$("drop"), phEl=$("ph");
 var runEl=$("run"), resetEl=$("reset");
 var alertEl=$("alert"), workingEl=$("working"), resultsEl=$("results");
 var noticeEl=$("notice");
@@ -331,13 +342,18 @@ function readFile(file){
   reader.readAsDataURL(file);
 }
 fileEl.onchange=function(e){ readFile(e.target.files&&e.target.files[0]); };
+fileCamEl.onchange=function(e){ readFile(e.target.files&&e.target.files[0]); };
+/* Androidのフォトピッカーには撮影の選択肢が無いため、撮影用(capture付き)と
+   選択用(captureなし)のinputをボタンで使い分ける */
+$("camBtn").onclick=function(e){ e.preventDefault(); e.stopPropagation(); fileCamEl.click(); };
+$("pickBtn").onclick=function(e){ e.preventDefault(); e.stopPropagation(); fileEl.click(); };
 dropEl.addEventListener("dragover",function(e){e.preventDefault();});
 dropEl.addEventListener("drop",function(e){
   e.preventDefault();
   readFile(e.dataTransfer.files&&e.dataTransfer.files[0]);
 });
 resetEl.onclick=function(){
-  img=null; fileEl.value="";
+  img=null; fileEl.value=""; fileCamEl.value="";
   var old=dropEl.querySelector("img"); if(old) old.remove();
   dropEl.classList.remove("has"); phEl.style.display="block";
   runEl.disabled=true; resetEl.style.display="none";

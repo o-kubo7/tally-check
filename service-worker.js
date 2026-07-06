@@ -1,7 +1,7 @@
 /* 入庫検算カメラ — Service Worker
    アプリ本体(シェル)をキャッシュしオフライン起動を可能にする。
    Gemini APIなど別オリジンへの通信はキャッシュせずネットワークへ素通し。 */
-var CACHE = "tally-check-v3";
+var CACHE = "tally-check-v4";
 var ASSETS = [
   "./index.html",
   "./manifest.json",
