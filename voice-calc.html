@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F2F3F1">
+<title>定数計算 — 音声入力</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+JP:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F2F3F1;
+  --ink:#15171A;
+  --mute:#767C7A;
+  --faint:#A7ADAA;
+  --live:#00A88F;
+  --on-live:#04231E;
+  --tape:26px;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#121413;
+    --ink:#ECEEEA;
+    --mute:#838A86;
+    --faint:#575D5A;
+    --live:#2FD6B8;
+    --on-live:#062621;
+  }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:"IBM Plex Sans JP",system-ui,sans-serif;
+  font-weight:400;
+  display:flex;justify-content:center;
+  padding:0 22px env(safe-area-inset-bottom) 22px;
+}
+.app{width:100%;max-width:440px;display:flex;flex-direction:column;min-height:100dvh}
+.num{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+/* ── 見出し ── */
+.head{display:flex;align-items:baseline;padding:26px 0 30px}
+.head h1{font-size:13px;font-weight:600;letter-spacing:.34em;margin:0}
+.head span{font-size:10px;font-weight:300;letter-spacing:.2em;color:var(--mute);margin-left:auto}
+
+/* ── テープ ── */
+.tape{display:flex;flex-direction:column}
+.row{
+  display:grid;grid-template-columns:34px 30px 1fr;align-items:center;
+  height:52px;
+}
+.row .drop{
+  border:none;background:none;padding:0;cursor:pointer;
+  color:var(--faint);font-size:17px;line-height:1;height:52px;
+}
+.row .drop:hover{color:var(--ink)}
+.row .op{
+  font-size:17px;font-weight:400;color:var(--faint);text-align:center;
+  font-family:"IBM Plex Mono",monospace;
+}
+.row input{
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:34px;font-weight:400;letter-spacing:-.01em;
+  color:var(--ink);background:none;border:none;
+  width:100%;text-align:right;padding:0;height:52px;
+}
+.row input:focus{outline:none;color:var(--live)}
+
+.tape-empty{
+  height:104px;display:flex;align-items:center;justify-content:flex-end;
+  font-size:13px;font-weight:300;color:var(--faint);letter-spacing:.06em;
+}
+
+/* ── 合計 ── */
+.sum{border-top:1px solid var(--ink);margin-top:14px;padding-top:20px}
+.sum .value{
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:clamp(56px,20vw,104px);line-height:.94;
+  font-weight:600;letter-spacing:-.035em;text-align:right;
+  word-break:break-all;
+}
+.sum .value.idle{color:var(--faint);font-weight:400}
+.sum .caption{
+  font-size:10px;font-weight:300;letter-spacing:.24em;color:var(--mute);
+  text-align:right;padding-top:16px;
+}
+.settle{animation:settle .16s ease-out}
+@keyframes settle{from{transform:translateY(7px);opacity:.35}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.settle{animation:none}}
+
+/* ── 状態表示 ── */
+.spacer{flex:1;min-height:20px}
+.heard{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:11px;font-weight:400;line-height:1.6;color:var(--mute);
+  min-height:20px;padding-bottom:12px;word-break:break-all;
+}
+.alert{
+  font-size:12.5px;font-weight:400;line-height:1.6;color:var(--ink);
+  border-left:2px solid var(--live);padding:2px 0 2px 12px;margin-bottom:18px;
+}
+.alert:empty{display:none}
+
+/* ── マイク ── */
+.mic{
+  width:100%;min-height:88px;border:none;border-radius:10px;cursor:pointer;
+  background:var(--ink);color:var(--bg);
+  font-family:inherit;font-size:15px;font-weight:600;letter-spacing:.22em;
+  display:flex;align-items:center;justify-content:center;gap:14px;
+}
+.mic .dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
+.mic[data-live="1"]{background:var(--live);color:var(--on-live)}
+.mic[data-live="1"] .dot{animation:breathe 1.4s ease-in-out infinite}
+.mic:disabled{background:none;color:var(--faint);box-shadow:inset 0 0 0 1px var(--faint);cursor:not-allowed}
+@keyframes breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.25;transform:scale(.55)}}
+@media (prefers-reduced-motion:reduce){.mic[data-live="1"] .dot{animation:none}}
+
+.minor{display:flex;gap:28px;padding:18px 2px 30px}
+.minor button{
+  border:none;background:none;padding:4px 0;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:400;letter-spacing:.18em;color:var(--mute);
+}
+.minor button:hover{color:var(--ink)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--live);outline-offset:4px}
+
+/* ── 履歴 ── */
+.hist h2{font-size:10px;font-weight:300;letter-spacing:.24em;color:var(--mute);margin:0 0 10px}
+.hist ul{list-style:none;margin:0;padding:0}
+.hist li{display:flex;align-items:baseline;gap:16px;padding:9px 0;cursor:pointer}
+.hist li:hover .h-sum{color:var(--live)}
+.hist .h-expr{
+  font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--mute);
+  flex:1;word-break:break-all;
+}
+.hist .h-sum{
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:16px;font-weight:500;color:var(--ink);
+}
+.hist .none{font-size:12px;font-weight:300;color:var(--faint);padding:2px 0}
+
+.diag{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:9.5px;line-height:1.9;color:var(--faint);
+  padding:34px 0 22px;
+}
+.diag button{
+  font:inherit;border:none;background:none;padding:2px 0;margin-left:10px;
+  color:var(--mute);text-decoration:underline;cursor:pointer;
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="head">
+    <h1>定数計算</h1>
+    <span>音声入力 / かけ算</span>
+  </header>
+
+  <div class="tape" id="tape"></div>
+
+  <section class="sum">
+    <div class="value idle num" id="total">0</div>
+    <div class="caption" id="caption">合計</div>
+  </section>
+
+  <div class="spacer"></div>
+
+  <div class="alert" id="alert"></div>
+  <div class="heard" id="heard"></div>
+
+  <button class="mic" id="mic" data-live="0">
+    <span class="dot"></span><span id="micLabel">押して話す</span>
+  </button>
+
+  <div class="minor">
+    <button id="clear">クリア</button>
+    <button id="add">手入力で追加</button>
+  </div>
+
+  <section class="hist">
+    <h2>履歴</h2>
+    <ul id="hist"></ul>
+  </section>
+
+  <div class="diag" id="diag"></div>
+</div>
+
+<script>
+"use strict";
+
+/* ========== 数値の正規化 ========== */
+const K_DIGIT = {'〇':0,'零':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9};
+const K_UNIT  = {'十':10,'百':100,'千':1000};
+const K_BIG   = {'万':10000,'億':100000000};
+
+function parseMixedNumeral(s){
+  let total = 0, section = 0, current = 0, digits = "";
+  const flush = () => { if (digits) { current = parseInt(digits, 10); digits = ""; } };
+  for (const ch of s) {
+    if (ch >= '0' && ch <= '9') { digits += ch; continue; }
+    flush();
+    if (ch in K_DIGIT)      current = K_DIGIT[ch];
+    else if (ch in K_UNIT){ section += (current || 1) * K_UNIT[ch]; current = 0; }
+    else if (ch in K_BIG) { total += ((section + current) || 1) * K_BIG[ch]; section = 0; current = 0; }
+  }
+  flush();
+  return total + section + current;
+}
+
+function normalize(text){
+  let t = text.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+  t = t.replace(/(\d)[,、](?=\d{3})/g, "$1");
+  t = t.replace(/[0-9〇零一二三四五六七八九十百千万億]+/g, run =>
+    /^[0-9]+$/.test(run) ? run : String(parseMixedNumeral(run)));
+  return t;
+}
+
+function extractNumbers(text){
+  const m = normalize(text).match(/\d+/g);
+  if (!m) return [];
+  return m.map(Number).filter(n => Number.isFinite(n) && n < 1e9);
+}
+
+/* ========== 状態 ========== */
+let nums = [];
+let history = [];
+let lastCommitted = "";
+
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString("ja-JP");
+const product = list => list.reduce((a, b) => a * b, 1);
+
+function render(animate){
+  renderTape();
+
+  const total = $("total"), caption = $("caption");
+  if (nums.length === 0) {
+    total.textContent = "0";
+    total.className = "value idle num";
+    caption.textContent = "合計";
+  } else {
+    total.textContent = fmt(product(nums));
+    total.className = "value num" + (animate ? " settle" : "");
+    caption.textContent = nums.length === 1 ? "合計 / 1項" : "合計 / " + nums.length + "項";
+    if (animate) total.addEventListener("animationend", () => total.classList.remove("settle"), { once:true });
+  }
+}
+
+function renderTape(){
+  const tape = $("tape");
+  tape.innerHTML = "";
+
+  if (nums.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "tape-empty";
+    empty.textContent = "数字を区切って話してください";
+    tape.append(empty);
+    return;
+  }
+
+  nums.forEach((n, i) => {
+    const row = document.createElement("div");
+    row.className = "row";
+
+    const drop = document.createElement("button");
+    drop.className = "drop";
+    drop.textContent = "×";
+    drop.setAttribute("aria-label", (i + 1) + "番目の数を削除");
+    drop.addEventListener("click", () => { nums.splice(i, 1); lastCommitted = ""; render(); });
+
+    const op = document.createElement("div");
+    op.className = "op";
+    op.textContent = i === 0 ? "" : "×";
+
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.inputMode = "numeric";
+    inp.value = n;
+    inp.setAttribute("aria-label", (i + 1) + "番目の数");
+    inp.addEventListener("input", () => { inp.value = inp.value.replace(/[^\d]/g, ""); });
+    inp.addEventListener("change", () => {
+      const v = parseInt(inp.value, 10);
+      nums[i] = Number.isFinite(v) ? v : n;
+      lastCommitted = "";
+      render();
+    });
+
+    row.append(drop, op, inp);
+    tape.append(row);
+  });
+}
+
+function renderHistory(){
+  const ul = $("hist");
+  ul.innerHTML = "";
+  if (history.length === 0) {
+    const li = document.createElement("li");
+    li.className = "none";
+    li.textContent = "まだ計算がありません";
+    ul.append(li);
+    return;
+  }
+  history.forEach(h => {
+    const li = document.createElement("li");
+    const e = document.createElement("span");
+    e.className = "h-expr";
+    e.textContent = h.list.join(" × ");
+    const v = document.createElement("span");
+    v.className = "h-sum";
+    v.textContent = fmt(h.value);
+    li.append(e, v);
+    li.addEventListener("click", () => { nums = h.list.slice(); lastCommitted = ""; render(true); });
+    ul.append(li);
+  });
+}
+
+function commit(){
+  if (nums.length === 0) return;
+  const key = nums.join("x");
+  if (key === lastCommitted) return;
+  lastCommitted = key;
+  history.unshift({ list: nums.slice(), value: product(nums) });
+  history = history.slice(0, 5);
+  renderHistory();
+}
+
+/* ========== 音声認識 ========== */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, wantListening = false, idleTimer = null;
+
+const alertMsg = m => { $("alert").textContent = m || ""; };
+
+function setMic(live){
+  $("mic").dataset.live = live ? "1" : "0";
+  $("micLabel").textContent = live ? "聞いています" : "押して話す";
+}
+
+function startListening(){
+  if (!SR) return;
+  wantListening = true;
+  setMic(true);
+  alertMsg("");
+  resetIdle();
+  spin();
+}
+
+function spin(){
+  if (!wantListening) return;
+  rec = new SR();
+  rec.lang = "ja-JP";
+  rec.continuous = false;      // Android では continuous:true が不安定
+  rec.interimResults = false;  // Android では途中結果が安定しない
+  rec.maxAlternatives = 1;
+
+  rec.onresult = e => {
+    const text = e.results[0][0].transcript;
+    const got = extractNumbers(text);
+    if (got.length) {
+      nums = nums.concat(got);
+      commit();
+      render(true);
+      $("heard").textContent = text;
+    } else {
+      $("heard").textContent = text + "  ← 数字が取れませんでした";
+    }
+    resetIdle();
+  };
+
+  rec.onerror = e => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+      wantListening = false; setMic(false);
+      alertMsg("マイクが許可されていません。ブラウザのサイト設定でマイクを許可してください。");
+    } else if (e.error === "network") {
+      alertMsg("ネットワークに接続できません。認識はオンラインで処理されます。");
+    }
+  };
+
+  rec.onend = () => { if (wantListening) setTimeout(spin, 120); };  // 短いセッションを繰り返す
+
+  try { rec.start(); }
+  catch (err) { setTimeout(() => { if (wantListening) spin(); }, 300); }
+}
+
+function stopListening(){
+  wantListening = false;
+  setMic(false);
+  clearTimeout(idleTimer);
+  if (rec) { try { rec.abort(); } catch (e) {} }
+}
+
+function resetIdle(){
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    stopListening();
+    $("heard").textContent = "無音のため停止しました";
+  }, 30000);
+}
+
+$("mic").addEventListener("click", () => { wantListening ? stopListening() : startListening(); });
+
+$("clear").addEventListener("click", () => {
+  nums = []; lastCommitted = ""; $("heard").textContent = ""; render();
+});
+
+$("add").addEventListener("click", () => {
+  nums.push(1);
+  render();
+  const inputs = $("tape").querySelectorAll("input");
+  const last = inputs[inputs.length - 1];
+  if (last) { last.select(); last.focus(); }
+});
+
+/* ========== 起動時チェック ========== */
+function boot(){
+  render();
+  renderHistory();
+
+  if (!window.isSecureContext) {
+    alertMsg("HTTPS でないため音声認識は使えません。https:// または localhost で開いてください。手入力は使えます。");
+    $("mic").disabled = true;
+  } else if (!SR) {
+    alertMsg("このブラウザは音声認識に対応していません。Android の Chrome で開いてください。手入力は使えます。");
+    $("mic").disabled = true;
+  }
+
+  const diag = $("diag");
+  const base = "speech " + (SR ? "ok" : "none") + "  ·  secure " + (window.isSecureContext ? "ok" : "no") + "  ·  on-device(ja-JP) ";
+  diag.textContent = base + "…";
+
+  if (SR && typeof SR.available === "function") {
+    SR.available({ langs: ["ja-JP"], processLocally: true }).then(status => {
+      diag.textContent = base + status;
+      if (status === "downloadable" && typeof SR.install === "function") {
+        const btn = document.createElement("button");
+        btn.textContent = "言語パックを入れる";
+        btn.addEventListener("click", () => {
+          btn.textContent = "取得中…";
+          SR.install({ langs: ["ja-JP"], processLocally: true })
+            .then(ok => { btn.textContent = ok ? "取得しました" : "取得できませんでした"; });
+        });
+        diag.append(btn);
+      }
+    }).catch(() => { diag.textContent = base + "unknown"; });
+  } else {
+    diag.textContent = base + "unsupported";
+  }
+}
+
+boot();
+</script>
+</body>
+</html>
